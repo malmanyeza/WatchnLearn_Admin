@@ -5,13 +5,14 @@ import app from '../firebase';
 import { getFirestore, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 
-const ContentDetailsScreen = ({ route}) => {
+const ContentDetailsScreen = ({ route }) => {
   const { subjectId, termId, chapterId, contentId } = route.params;
   const [content, setContent] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState('');
+  const [editedPosition, setEditedPosition] = useState('');
 
-  const navigation = useNavigation();   
+  const navigation = useNavigation();
 
   useEffect(() => {
     const firestore = getFirestore(app);
@@ -25,19 +26,18 @@ const ContentDetailsScreen = ({ route}) => {
       const contentDocSnapshot = await getDoc(contentDocRef);
 
       if (contentDocSnapshot.exists()) {
-        setContent({ id: contentDocSnapshot.id, ...contentDocSnapshot.data() });
-        setEditedContent(contentDocSnapshot.data().topicName); // Assuming 'topicName' is an attribute
+        const data = contentDocSnapshot.data();
+        setContent({ id: contentDocSnapshot.id, ...data });
+        setEditedContent(data.topicName); // Assuming 'topicName' is an attribute
+        setEditedPosition(data.position.toString()); // Assuming 'position' is an attribute
       }
     };
 
     fetchContentDetails();
   }, [subjectId, termId, chapterId, contentId]);
 
-  const handleEditToggle = () => {
-    setIsEditing(!isEditing);
-  };
-
   const handleSaveEdits = async () => {
+    console.log('Saving edits...');
     try {
       const firestore = getFirestore(app);
       const contentDocRef = doc(
@@ -46,9 +46,10 @@ const ContentDetailsScreen = ({ route}) => {
         contentId
       );
 
-      // Update the content with the edited value
+      // Update the content with the edited values
       await updateDoc(contentDocRef, {
-        topicName: editedContent, // Update with the actual attribute you want to edit
+        topicName: editedContent,
+        position: parseInt(editedPosition), // Convert position to an integer
         // Add more attributes as needed
       });
 
@@ -87,8 +88,16 @@ const ContentDetailsScreen = ({ route}) => {
               onChangeText={(text) => setEditedContent(text)}
             />
           </View>
+          <View style={styles.itemContainer}>
+            <Text>Position:</Text>
+            <TextInput
+              style={styles.input}
+              value={editedPosition}
+              onChangeText={(text) => setEditedPosition(text)}
+            />
+          </View>
           {/* Display more attributes here */}
-          <Button title={isEditing ? 'Save Edits' : 'Edit'} onPress={isEditing ? handleSaveEdits : handleEditToggle} />
+          <Button title={'Save Edits'} onPress={handleSaveEdits} />
           <Button title={`View ${content.contentType}`} onPress={handleViewContent} />
         </View>
       )}
@@ -112,12 +121,12 @@ const styles = StyleSheet.create({
     borderColor: 'gray',
     borderWidth: 1,
     padding: 8,
-    marginLeft: 20,
+    borderRadius: 5,
+    marginTop:5,
   },
   itemContainer: {
     marginBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent:'center'
   },
 });
 

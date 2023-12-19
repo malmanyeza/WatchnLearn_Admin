@@ -1,11 +1,12 @@
 // ContentScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Button, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Button, StyleSheet, TextInput } from 'react-native';
 import { FontAwesome, Entypo, MaterialIcons } from '@expo/vector-icons'; // Import icons from expo vector icons
 import AddContentModal from '../modals/AddContentModal';
 import AddExerciseModal from '../modals/AddExerciseModal';
 import app from '../firebase';
-import { getFirestore, doc, getDoc, collection, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import {getStorage, ref, deleteObject} from 'firebase/storage';
 import { useNavigation } from '@react-navigation/native';
 
 const ContentScreen = ({ route }) => {
@@ -14,6 +15,8 @@ const ContentScreen = ({ route }) => {
   const [contents, setContents] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isExerciseModalVisible, setIsExerciseModalVisible] = useState(false);
+  const [newChapterName, setNewChapterName] = useState('');
+  const [newChapterPosition, setNewChapterPosition] = useState('');
 
   const navigation = useNavigation();
 
@@ -77,6 +80,32 @@ const ContentScreen = ({ route }) => {
     setIsModalVisible(false);
   };
 
+  const handleSaveChanges = async () => {
+    try {
+      if (!chapter) {
+        console.error('Chapter not found.');
+        return;
+      }
+
+      const firestore = getFirestore(app);
+      const chapterDocRef = doc(
+        firestore,
+        `subjects/${subjectId}/terms/${termId}/chapters`,
+        chapterId
+      );
+
+      // Update chapter details in Firestore
+      await updateDoc(chapterDocRef, {
+        name: newChapterName || chapter.name,
+        position: newChapterPosition || chapter.position,
+      });
+
+      console.log('Chapter details updated successfully');
+    } catch (error) {
+      console.error('Error updating chapter details:', error);
+    }
+  };
+
   const handleUploadExercise = async (exerciseDetails) => {
     try {
       const firestore = getFirestore(app);
@@ -103,7 +132,7 @@ const ContentScreen = ({ route }) => {
     });
   };
 
-  const handleDeleteContent = async (contentId) => {
+  const handleDeleteContent = async (contentId, contentUrl) => {
     try {
       const firestore = getFirestore(app);
       const contentDocRef = doc(
@@ -111,13 +140,62 @@ const ContentScreen = ({ route }) => {
         `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`,
         contentId
       );
-
+  
+      // Retrieve contentUrl and contentType from the content item
+      const contentDocSnapshot = await getDoc(contentDocRef);
+      const contentData = contentDocSnapshot.data();
+  
+      if (!contentData) {
+        console.error('Content not found.');
+        return;
+      }
+  
+      const { contentType } = contentData;
+  
       // Delete the content from Firestore
       await deleteDoc(contentDocRef);
-
-      console.log('Content deleted successfully');
+  
+      // Delete the corresponding file from Firebase Storage
+      const storage = getStorage(app);
+  
+      if (contentType === 'pdf' || contentType === 'video') {
+        const fileRef = ref(storage, contentUrl);
+        await deleteObject(fileRef);
+      } else if (contentType === 'exercise') {
+        // Retrieve the exercise data from Firestore
+        const exerciseDocRef = doc(
+          firestore,
+          `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`,
+          contentId
+        );
+        const exerciseDocSnapshot = await getDoc(exerciseDocRef);
+        const exerciseData = exerciseDocSnapshot.data();
+  
+        // Delete files associated with the exercise questions and answers
+        if (exerciseData && exerciseData.questions) {
+          for (const questionId of Object.keys(exerciseData.questions)) {
+            const question = exerciseData.questions[questionId];
+            if (question.image) {
+              const questionImageRef = ref(storage, question.image);
+              await deleteObject(questionImageRef);
+            }
+  
+            if (question.answers) {
+              for (const answerId of Object.keys(question.answers)) {
+                const answer = question.answers[answerId];
+                if (answer.image) {
+                  const answerImageRef = ref(storage, answer.image);
+                  await deleteObject(answerImageRef);
+                }
+              }
+            }
+          }
+        }
+      }
+  
+      console.log('Content and file deleted successfully');
     } catch (error) {
-      console.error('Error deleting content:', error);
+      console.error('Error deleting content and file:', error);
     }
   };
 
@@ -156,6 +234,21 @@ const ContentScreen = ({ route }) => {
 
   return (
     <View style={styles.container}>
+      <Text>Chapter Name:</Text>
+      <TextInput
+        style={styles.input}
+        value={newChapterName || (chapter && chapter.name) || ''}
+        onChangeText={(text) => setNewChapterName(text)}
+      />
+
+      <Text>Current Chapter Position:</Text>
+      <TextInput
+        style={styles.input}
+        value={newChapterPosition || (chapter && chapter.position) || ''}
+        onChangeText={(text) => setNewChapterPosition(text)}
+      />
+
+      <Button title="Save Changes" onPress={handleSaveChanges} />
       <Button title="Add New Content" onPress={toggleModal} />
       <Button title="Create an Exercise" onPress={toggleExerciseModal} />
       {chapter && (
@@ -211,6 +304,14 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
   },
+  input: {
+    marginTop:5,
+    borderWidth: 1,
+    borderColor: 'gray',
+    padding: 8,
+    marginBottom: 16,
+    borderRadius:5
+  }
 });
 
 export default ContentScreen;

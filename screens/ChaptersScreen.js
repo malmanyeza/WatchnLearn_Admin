@@ -1,9 +1,11 @@
+// ChaptersScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Button, StyleSheet } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons'; // Import FontAwesome from expo vector icons
 import NewChapterModal from '../modals/NewChapterModal';
 import { useNavigation } from '@react-navigation/native';
 import app from '../firebase';
-import { getFirestore, doc, getDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, getDocs, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
 
 const ChaptersScreen = ({ route }) => {
   const { subjectId, termId } = route.params;
@@ -15,7 +17,6 @@ const ChaptersScreen = ({ route }) => {
   useEffect(() => {
     const firestore = getFirestore(app);
   
-    // Fetch term details
     const fetchTermDetails = async () => {
       const termDocRef = doc(firestore, `subjects/${subjectId}/terms`, termId);
       const termDocSnapshot = await getDoc(termDocRef);
@@ -25,7 +26,6 @@ const ChaptersScreen = ({ route }) => {
       }
     };
   
-    // Fetch chapters and set up real-time listener
     const chaptersCollection = collection(firestore, `subjects/${subjectId}/terms/${termId}/chapters`);
     const unsubscribe = onSnapshot(chaptersCollection, (snapshot) => {
       const chaptersData = snapshot.docs.map((doc) => ({
@@ -35,10 +35,8 @@ const ChaptersScreen = ({ route }) => {
       setChapters(chaptersData);
     });
   
-    // Fetch term details once at the beginning
     fetchTermDetails();
   
-    // Clean up the listener when the component unmounts
     return () => unsubscribe();
   }, [subjectId, termId]);
   
@@ -47,15 +45,11 @@ const ChaptersScreen = ({ route }) => {
   };
   
   const handleCreateChapter = (newChapterName) => {
-    // Implement logic to create a new chapter in your database
-    // The real-time listener will automatically update the local state
     console.log('Creating new chapter:', newChapterName);
-    // Close the modal
     setIsModalVisible(false);
   };
 
   const handleChapterPress = (chapter) => {
-    // Navigate to ContentScreen with the selected chapter details
     navigation.navigate('Content', {
       subjectId,
       termId,
@@ -63,12 +57,34 @@ const ChaptersScreen = ({ route }) => {
     });
   };
 
+  const handleDeleteChapter = async (chapterId) => {
+    try {
+      const firestore = getFirestore(app);
+      const chapterDocRef = doc(
+        firestore,
+        `subjects/${subjectId}/terms/${termId}/chapters`,
+        chapterId
+      );
+
+      await deleteDoc(chapterDocRef);
+
+      console.log('Chapter deleted successfully');
+    } catch (error) {
+      console.error('Error deleting chapter:', error);
+    }
+  };
+
   const renderChapterItem = ({ item }) => (
     <TouchableOpacity
       style={styles.chapterItem}
       onPress={() => handleChapterPress(item)}
     >
-      <Text>{item.name}</Text>
+      <View style={styles.itemContainer}>
+        <Text>{item.name}</Text>
+        <TouchableOpacity onPress={() => handleDeleteChapter(item.id)}>
+          <FontAwesome name="trash" size={20} color="gray" />
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
@@ -114,6 +130,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     backgroundColor: '#eee',
     borderRadius: 8,
+  },
+  itemContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });
 

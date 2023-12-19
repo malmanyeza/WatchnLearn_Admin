@@ -66,7 +66,7 @@ const AddContentModal = ({ isVisible, onClose, onCreateContent, chapterId }) => 
           contentType,
           timeframe,
           position,
-          downloadURL,
+          contentUrl:downloadURL,
           chapterId,
         });
 

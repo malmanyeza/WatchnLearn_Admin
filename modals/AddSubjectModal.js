@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -20,7 +21,7 @@ import { getFirestore, collection, addDoc } from 'firebase/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import app from '../firebase';
 
-const AddSubjectScreen = ({ isVisible, onClose }) => {
+const AddSubjectModal = ({ isVisible, onClose }) => {
   const [subjectName, setSubjectName] = useState('');
   const [category, setCategory] = useState('');
   const [imageUri, setImageUri] = useState(null);
@@ -220,4 +221,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AddSubjectScreen;
+export default AddSubjectModal;

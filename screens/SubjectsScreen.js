@@ -1,47 +1,65 @@
+// SubjectsScreen.js
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons'; // Import FontAwesome from expo vector icons
 import app from '../firebase';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, deleteDoc, doc} from 'firebase/firestore';
+import {ref, getStorage, deleteObject} from 'firebase/storage';
 import { useNavigation } from '@react-navigation/native';
+import AddSubjectModal from '../modals/AddSubjectModal'; // Import your AddSubjectModal component
 
 const SubjectsScreen = () => {
   const [subjects, setSubjects] = useState([]);
-    const navigation = useNavigation();
+  const [isAddSubjectModalVisible, setAddSubjectModalVisible] = useState(false);
+  const navigation = useNavigation();
 
   useEffect(() => {
-    const fetchData = async () => {
-      const firestore = getFirestore(app);
-      const subjectsCollection = collection(firestore, 'subjects');
-      const subjectsSnapshot = await getDocs(subjectsCollection);
+    const firestore = getFirestore(app);
+    const subjectsCollection = collection(firestore, 'subjects');
 
-      const subjectsData = subjectsSnapshot.docs.map((doc) => ({
+    const unsubscribe = onSnapshot(subjectsCollection, (snapshot) => {
+      const subjectsData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-
       setSubjects(subjectsData);
-    };
+    });
 
-    fetchData();
+    return () => unsubscribe(); // Unsubscribe when the component is unmounted
   }, []);
 
   const handleSubjectPress = (subjectId) => {
-    // Navigate to SubjectDetailsScreen with subjectId parameter
     navigation.navigate('SubjectDetails', { subjectId });
   };
 
+  const handleDeleteSubject = async (subjectId, imageUrl) => {
+    try {
+      const firestore = getFirestore(app);
+      const storage = getStorage(app);
+  
+      // Delete image from Firebase Storage
+      const imageRef = ref(storage, imageUrl);
+      await deleteObject(imageRef);
+  
+      // Delete subject from Firestore
+      const subjectDocRef = doc(firestore, 'subjects', subjectId);
+      await deleteDoc(subjectDocRef);
+  
+      console.log('Subject and image deleted successfully');
+    } catch (error) {
+      console.error('Error deleting subject and image:', error);
+    }
+  };
+  
+
   const renderSubjectItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.subjectItem}
-      onPress={() => handleSubjectPress(item.id)}
-    >
-      <Text>{item.name}</Text>
+    <TouchableOpacity style={styles.subjectItem} onPress={() => handleSubjectPress(item.id)}>
+      <View style={styles.itemContainer}>
+        <Text>{item.name}</Text>
+        <TouchableOpacity onPress={() => handleDeleteSubject(item.id, item.imageUrl)}>
+          <FontAwesome name="trash" size={20} color="gray" />
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
@@ -55,13 +73,18 @@ const SubjectsScreen = () => {
 
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => {
-          // Navigate to the AddSubjectScreen
-          navigation.navigate('AddSubject');
-        }}
+        onPress={() => setAddSubjectModalVisible(true)}
       >
         <Text style={styles.addButtonText}>Add New Subject</Text>
       </TouchableOpacity>
+
+      {/* AddSubjectModal */}
+      
+        <AddSubjectModal 
+          onClose={() => setAddSubjectModalVisible(false)}
+          isVisible={isAddSubjectModalVisible} 
+        />
+      
     </View>
   );
 };
@@ -76,6 +99,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     backgroundColor: '#eee',
     borderRadius: 8,
+  },
+  itemContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   addButton: {
     position: 'absolute',

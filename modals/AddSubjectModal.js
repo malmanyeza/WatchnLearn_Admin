@@ -18,7 +18,7 @@ import {
   getDownloadURL,
   uploadBytes,
 } from 'firebase/storage';
-import { getFirestore, collection, addDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, setDoc, updateDoc } from 'firebase/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import app from '../firebase';
@@ -121,7 +121,6 @@ const AddSubjectModal = ({ isVisible, onClose }) => {
       // Add subject to "subjects" collection
       const docRef = await addDoc(collection(firestore, 'subjects'), {
         name: subjectName,
-        subjectId: docRef.id,
         category,
         subjectImageUrl,
         tutor: {
@@ -135,48 +134,29 @@ const AddSubjectModal = ({ isVisible, onClose }) => {
         },
       });
 
+      await updateDoc(docRef, { subjectId: docRef.id });
+
       // Add terms to the subject
-      await addDoc(collection(firestore, `subjects/${docRef.id}/terms`), {
-        termNumber: 1,
-        name: 'Form 5 Term 1',
-        subjectId: docRef.id,
-      });
+      // Loop to create and update term documents
+      for (let i = 1; i <= 6; i++) {
+        await (async () => {
+          const termData = {
+            termNumber: i,
+            form: i <= 3 ? '5' : '6',
+            term: i <= 3 ? `${i}` : `${i - 3}`,
+            subjectId: docRef.id,
+          };
+          const termDocRef = await addDoc(collection(firestore, `subjects/${docRef.id}/terms`), termData);
+          await updateDoc(termDocRef, { termId: termDocRef.id });
+        })();
+      }
 
-      await addDoc(collection(firestore, `subjects/${docRef.id}/terms`), {  
-        termNumber: 2,
-        name: 'Form 5 Term 2',
-        subjectId: docRef.id,
-      });
-
-      await addDoc(collection(firestore, `subjects/${docRef.id}/terms`), {
-        termNumber: 3,
-        name: 'Form 5 Term 3',
-        subjectId: docRef.id,
-      });
-
-      await addDoc(collection(firestore, `subjects/${docRef.id}/terms`), {
-        termNumber: 4,
-        name: 'Form 6 Term 1',
-        subjectId: docRef.id,
-      });
-
-      await addDoc(collection(firestore, `subjects/${docRef.id}/terms`), {
-        termNumber: 5,
-        name: 'Form 6 Term 2',
-        subjectId: docRef.id,
-      });
-
-      await addDoc(collection(firestore, `subjects/${docRef.id}/terms`), {
-        termNumber: 6,
-        name: 'Form 6 Term 3',
-        subjectId: docRef.id,
-      });
       
       setLoading(false);
       alert('Success', 'Subject saved successfully!');
       onClose(); // Close the modal after successful save
     } catch (error) {
-      se
+      setLoading(false);
       console.error('Error saving subject:', error);
       alert(
         'Error',

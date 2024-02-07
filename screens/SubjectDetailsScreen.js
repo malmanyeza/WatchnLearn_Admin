@@ -35,6 +35,8 @@ const SubjectDetailsScreen = ({ route }) => {
         id: doc.id,
         ...doc.data(),
       }));
+      // Sort terms by termNumber in ascending order
+      termsData.sort((a, b) => a.termNumber - b.termNumber);
       setTerms(termsData);
     };
 
@@ -68,7 +70,7 @@ const SubjectDetailsScreen = ({ route }) => {
       style={styles.termItem}
       onPress={() => handleTermPress(item.id)}
     >
-      <Text>{item.name}</Text>
+      <Text>form {item.form} term: {item.term}</Text>
     </TouchableOpacity>
   );
 

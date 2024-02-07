@@ -56,8 +56,8 @@ const SubjectsScreen = () => {
     <TouchableOpacity style={styles.subjectItem} onPress={() => handleSubjectPress(item.id)}>
       <View style={styles.itemContainer}>
         <Text>{item.name}</Text>
-        <TouchableOpacity onPress={() => handleDeleteSubject(item.id, item.imageUrl)}>
-          <FontAwesome name="trash" size={20} color="gray" />
+        <TouchableOpacity onPress={() => handleDeleteSubject(item.subjectId, item.imageUrl)}>
+          <FontAwesome name="trash" size={20} color="black" />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

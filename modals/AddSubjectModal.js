@@ -121,6 +121,7 @@ const AddSubjectModal = ({ isVisible, onClose }) => {
       // Add subject to "subjects" collection
       const docRef = await addDoc(collection(firestore, 'subjects'), {
         name: subjectName,
+        subjectId: docRef.id,
         category,
         subjectImageUrl,
         tutor: {

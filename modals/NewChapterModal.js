@@ -7,6 +7,7 @@ import { getFirestore, collection, addDoc } from 'firebase/firestore';
 const NewChapterModal = ({ isVisible, onClose, onCreateChapter, subjectId, termId }) => {
   const [newChapterName, setNewChapterName] = useState('');
   const [position, setPosition] = useState('');
+  const [week, setWeek] = useState('');
 
   const handleCreateChapter = async () => {
     try {
@@ -15,7 +16,8 @@ const NewChapterModal = ({ isVisible, onClose, onCreateChapter, subjectId, termI
       // Add the new chapter to the "chapters" collection under the specific term
       const chapterDocRef = await addDoc(collection(firestore, `subjects/${subjectId}/terms/${termId}/chapters`), {
         name: newChapterName,
-        position
+        position,
+        week
         // Add any other relevant chapter properties here
       });
 
@@ -52,6 +54,12 @@ const NewChapterModal = ({ isVisible, onClose, onCreateChapter, subjectId, termI
             style={styles.input}
             value={position}
             onChangeText={setPosition}
+          />
+
+          <TextInput
+            style={styles.input}
+            value={week}
+            onChangeText={setWeek}
           />
 
           <Button title="Create Chapter" onPress={handleCreateChapter} />

@@ -37,8 +37,11 @@ const SubjectsScreen = () => {
       const firestore = getFirestore(app);
       const storage = getStorage(app);
   
-      // Delete image from Firebase Storage
-      const imageRef = ref(storage, imageUrl);
+      // Extract the image filename from the URL
+      const filename = imageUrl.split('/').pop();
+  
+      // Delete image from Firebase Storage in the "subject_images" folder
+      const imageRef = ref(storage, `subject_images/${filename}`);
       await deleteObject(imageRef);
   
       // Delete subject from Firestore

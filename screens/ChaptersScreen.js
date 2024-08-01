@@ -1,51 +1,75 @@
-// ChaptersScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Button, StyleSheet } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons'; // Import FontAwesome from expo vector icons
 import NewChapterModal from '../modals/NewChapterModal';
 import { useNavigation } from '@react-navigation/native';
 import app from '../firebase';
-import { getFirestore, doc, getDoc, getDocs, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, onSnapshot, deleteDoc, addDoc } from 'firebase/firestore';
+import { useMyContext } from '../hooks/contextAPI';
 
 const ChaptersScreen = ({ route }) => {
-  const { subjectId, termId } = route.params;
+  const { subjectId = null, termId = null } = route.params || {};
   const [term, setTerm] = useState(null);
   const [chapters, setChapters] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const navigation = useNavigation();
+  const { levelState, selectedCourseId } = useMyContext();
 
   useEffect(() => {
     const firestore = getFirestore(app);
-  
     const fetchTermDetails = async () => {
-      const termDocRef = doc(firestore, `subjects/${subjectId}/terms`, termId);
-      const termDocSnapshot = await getDoc(termDocRef);
-  
-      if (termDocSnapshot.exists()) {
-        setTerm({ id: termDocSnapshot.id, ...termDocSnapshot.data() });
+      if (levelState !== 'Tertiary') {
+        const termDocRef = doc(firestore, `subjects/${subjectId}/terms`, termId);
+        const termDocSnapshot = await getDoc(termDocRef);
+        if (termDocSnapshot.exists()) {
+          setTerm({ id: termDocSnapshot.id, ...termDocSnapshot.data() });
+        }
       }
     };
-  
-    const chaptersCollection = collection(firestore, `subjects/${subjectId}/terms/${termId}/chapters`);
+
+    const chaptersCollectionPath =
+      levelState === 'Tertiary'
+        ? `courses/${selectedCourseId}/chapters`
+        : `subjects/${subjectId}/terms/${termId}/chapters`;
+    const chaptersCollection = collection(firestore, chaptersCollectionPath);
+
     const unsubscribe = onSnapshot(chaptersCollection, (snapshot) => {
       const chaptersData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
+      // Sort chapters by position
+      chaptersData.sort((a, b) => a.position - b.position);
       setChapters(chaptersData);
+      console.log('Chapters:', chaptersData);
     });
-  
+
     fetchTermDetails();
-  
+
     return () => unsubscribe();
-  }, [subjectId, termId]);
-  
+  }, [subjectId, termId, levelState, selectedCourseId]);
+
   const toggleModal = () => {
     setIsModalVisible(!isModalVisible);
   };
-  
-  const handleCreateChapter = (newChapterName) => {
-    console.log('Creating new chapter:', newChapterName);
+
+  const handleCreateChapter = async (newChapterName) => {
+    try {
+      const firestore = getFirestore(app);
+      const chaptersCollectionPath =
+        levelState === 'Tertiary'
+          ? `courses/${selectedCourseId}/chapters`
+          : `subjects/${subjectId}/terms/${termId}/chapters`;
+
+      const chaptersCollection = collection(firestore, chaptersCollectionPath);
+      const position = chapters.length + 1; // Set position as the next in sequence
+      await addDoc(chaptersCollection, { name: newChapterName, position });
+
+      console.log('New Chapter added:', newChapterName);
+    } catch (error) {
+      console.error('Error creating new chapter:', error);
+    }
+
     setIsModalVisible(false);
   };
 
@@ -62,7 +86,9 @@ const ChaptersScreen = ({ route }) => {
       const firestore = getFirestore(app);
       const chapterDocRef = doc(
         firestore,
-        `subjects/${subjectId}/terms/${termId}/chapters`,
+        levelState === 'Tertiary'
+          ? `courses/${selectedCourseId}/chapters`
+          : `subjects/${subjectId}/terms/${termId}/chapters`,
         chapterId
       );
 
@@ -74,13 +100,13 @@ const ChaptersScreen = ({ route }) => {
     }
   };
 
-  const renderChapterItem = ({ item }) => (
+  const renderChapterItem = ({ item, index }) => (
     <TouchableOpacity
       style={styles.chapterItem}
       onPress={() => handleChapterPress(item)}
     >
       <View style={styles.itemContainer}>
-        <Text>{item.name}</Text>
+        <Text>{index + 1}. {item.name}</Text>
         <TouchableOpacity onPress={() => handleDeleteChapter(item.id)}>
           <FontAwesome name="trash" size={20} color="gray" />
         </TouchableOpacity>
@@ -91,17 +117,15 @@ const ChaptersScreen = ({ route }) => {
   return (
     <View style={styles.container}>
       <Button title="Add New Chapter" onPress={toggleModal} />
-      {term && (
-        <View>
-          <Text style={styles.heading}>Term: {term.name}</Text>
-          <Text style={styles.heading}>Chapters:</Text>
-          <FlatList
-            data={chapters}
-            keyExtractor={(item) => item.id}
-            renderItem={renderChapterItem}
-          />
-        </View>
+      {levelState !== 'Tertiary' && term && (
+        <Text style={styles.heading}>Term: {term.name}</Text>
       )}
+      <Text style={styles.heading}>Chapters:</Text>
+      <FlatList
+        data={chapters}
+        keyExtractor={(item) => item.id}
+        renderItem={renderChapterItem}
+      />
 
       <NewChapterModal
         isVisible={isModalVisible}

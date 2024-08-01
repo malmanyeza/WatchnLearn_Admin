@@ -1,4 +1,3 @@
-// ContentScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Button, StyleSheet, TextInput } from 'react-native';
 import { FontAwesome, Entypo, MaterialIcons } from '@expo/vector-icons'; // Import icons from expo vector icons
@@ -6,11 +5,13 @@ import AddContentModal from '../modals/AddContentModal';
 import AddExerciseModal from '../modals/AddExerciseModal';
 import app from '../firebase';
 import { getFirestore, doc, getDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import {getStorage, ref, deleteObject} from 'firebase/storage';
+import { getStorage, ref, deleteObject } from 'firebase/storage';
 import { useNavigation } from '@react-navigation/native';
+import { useMyContext } from '../hooks/contextAPI';
 
 const ContentScreen = ({ route }) => {
-  const { subjectId, termId, chapterId } = route.params;
+  const { subjectId = null, termId = null, chapterId = null } = route.params || {};
+  const { levelState, selectedCourseId } = useMyContext();
   const [chapter, setChapter] = useState(null);
   const [contents, setContents] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -26,7 +27,9 @@ const ContentScreen = ({ route }) => {
     const fetchChapterDetails = async () => {
       const chapterDocRef = doc(
         firestore,
-        `subjects/${subjectId}/terms/${termId}/chapters`,
+        levelState === 'Tertiary'
+          ? `courses/${selectedCourseId}/chapters`
+          : `subjects/${subjectId}/terms/${termId}/chapters`,
         chapterId
       );
       const chapterDocSnapshot = await getDoc(chapterDocRef);
@@ -36,23 +39,25 @@ const ContentScreen = ({ route }) => {
       }
     };
 
-    const contentsCollection = collection(
-      firestore,
-      `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`
-    );
+    const contentsCollectionPath = levelState === 'Tertiary'
+      ? `courses/${selectedCourseId}/chapters/${chapterId}/contents`
+      : `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`;
+    
+    const contentsCollection = collection(firestore, contentsCollectionPath);
 
     const unsubscribe = onSnapshot(contentsCollection, (snapshot) => {
       const contentsData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
+      contentsData.sort((a, b) => a.position - b.position); // Sort contents by position
       setContents(contentsData);
     });
 
     fetchChapterDetails();
 
     return () => unsubscribe();
-  }, [subjectId, termId, chapterId]);
+  }, [subjectId, termId, chapterId, levelState, selectedCourseId]);
 
   const toggleModal = () => {
     setIsModalVisible(!isModalVisible);
@@ -65,20 +70,52 @@ const ContentScreen = ({ route }) => {
   const handleCreateContent = async (newContent) => {
     try {
       const firestore = getFirestore(app);
-      const contentsCollection = collection(
-        firestore,
-        `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`
-      );
-
+      const contentsCollectionPath = levelState === 'Tertiary'
+        ? `courses/${selectedCourseId}/chapters/${chapterId}/contents`
+        : `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`;
+  
+      const contentsCollection = collection(firestore, contentsCollectionPath);
       const newContentRef = await addDoc(contentsCollection, newContent);
-
+  
       console.log('New Content added with ID:', newContentRef.id);
+  
+      // Extract digits from timeframe
+      const extractDigits = (str) => {
+        const match = str.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+      };
+  
+      const timeframeInMinutes = extractDigits(newContent.timeframe);
+  
+      // Update totalTime for the subject or course
+      const docPath = levelState === 'Tertiary'
+        ? `courses/${selectedCourseId}`
+        : `subjects/${subjectId}/terms/${termId}`;
+  
+      const docRef = doc(firestore, docPath);
+      const docSnapshot = await getDoc(docRef);
+  
+      if (docSnapshot.exists()) {
+        const currentData = docSnapshot.data();
+        const currentTotalTime = currentData.totalTime || 0;
+        const newTotalTime = currentTotalTime + timeframeInMinutes;
+  
+        await updateDoc(docRef, {
+          totalTime: newTotalTime,
+        });
+  
+        console.log('Total time updated successfully:', newTotalTime);
+      } else {
+        console.error('Document does not exist!');
+      }
     } catch (error) {
       console.error('Error creating new content:', error);
     }
-
+  
     setIsModalVisible(false);
   };
+  
+  
 
   const handleSaveChanges = async () => {
     try {
@@ -90,7 +127,9 @@ const ContentScreen = ({ route }) => {
       const firestore = getFirestore(app);
       const chapterDocRef = doc(
         firestore,
-        `subjects/${subjectId}/terms/${termId}/chapters`,
+        levelState === 'Tertiary'
+          ? `courses/${selectedCourseId}/chapters`
+          : `subjects/${subjectId}/terms/${termId}/chapters`,
         chapterId
       );
 
@@ -109,18 +148,46 @@ const ContentScreen = ({ route }) => {
   const handleUploadExercise = async (exerciseDetails) => {
     try {
       const firestore = getFirestore(app);
-      const exercisesCollection = collection(
-        firestore,
-        `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`
-      );
-
+      const exercisesCollectionPath = levelState === 'Tertiary'
+        ? `courses/${selectedCourseId}/chapters/${chapterId}/contents`
+        : `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`;
+  
+      const exercisesCollection = collection(firestore, exercisesCollectionPath);
       const exerciseRef = await addDoc(exercisesCollection, exerciseDetails);
-
+  
       console.log('Exercise added with ID:', exerciseRef.id);
+  
+      // Extract digits from timeframe
+      const extractDigits = (str) => {
+        const match = str.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+      };
+  
+      const timeframeInMinutes = extractDigits(exerciseDetails.timeframe);
+  
+      // Update totalTime for the subject or course
+      const docPath = levelState === 'Tertiary' ? `courses/${selectedCourseId}` : `subjects/${subjectId}/terms/${termId}`;
+      const docRef = doc(firestore, docPath);
+      const docSnapshot = await getDoc(docRef);
+  
+      if (docSnapshot.exists()) {
+        const currentData = docSnapshot.data();
+        const currentTotalTime = currentData.totalTime || 0;
+        const newTotalTime = currentTotalTime + timeframeInMinutes;
+  
+        await updateDoc(docRef, {
+          totalTime: newTotalTime,
+        });
+  
+        console.log('Total time updated successfully:', newTotalTime);
+      } else {
+        console.error('Document does not exist!');
+      }
     } catch (error) {
       console.error('Error uploading exercise:', error);
     }
   };
+  
 
   const handleContentClick = (contentId) => {
     // Navigate to ContentDetailsScreen with the selected contentId
@@ -132,16 +199,18 @@ const ContentScreen = ({ route }) => {
     });
   };
 
-  const handleDeleteContent = async (contentId, contentUrl) => {
+  const handleDeleteContent = async (contentId) => {
     try {
       const firestore = getFirestore(app);
       const contentDocRef = doc(
         firestore,
-        `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`,
+        levelState === 'Tertiary'
+          ? `courses/${selectedCourseId}/chapters/${chapterId}/contents`
+          : `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`,
         contentId
       );
   
-      // Retrieve contentUrl and contentType from the content item
+      // Retrieve contentUrl, contentType, and timeframe from the content item
       const contentDocSnapshot = await getDoc(contentDocRef);
       const contentData = contentDocSnapshot.data();
   
@@ -150,7 +219,15 @@ const ContentScreen = ({ route }) => {
         return;
       }
   
-      const { contentType } = contentData;
+      const { contentType, contentUrl, timeframe } = contentData;
+  
+      // Extract digits from timeframe
+      const extractDigits = (str) => {
+        const match = str.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+      };
+  
+      const timeframeInMinutes = extractDigits(timeframe);
   
       // Delete the content from Firestore
       await deleteDoc(contentDocRef);
@@ -165,7 +242,9 @@ const ContentScreen = ({ route }) => {
         // Retrieve the exercise data from Firestore
         const exerciseDocRef = doc(
           firestore,
-          `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`,
+          levelState === 'Tertiary'
+            ? `courses/${selectedCourseId}/chapters/${chapterId}/contents`
+            : `subjects/${subjectId}/terms/${termId}/chapters/${chapterId}/contents`,
           contentId
         );
         const exerciseDocSnapshot = await getDoc(exerciseDocRef);
@@ -193,11 +272,31 @@ const ContentScreen = ({ route }) => {
         }
       }
   
+      // Update totalTime for the subject or course
+      const docPath = levelState === 'Tertiary' ? `courses/${selectedCourseId}` : `subjects/${subjectId}/terms/${termId}`;
+      const docRef = doc(firestore, docPath);
+      const docSnapshot = await getDoc(docRef);
+  
+      if (docSnapshot.exists()) {
+        const currentData = docSnapshot.data();
+        const currentTotalTime = currentData.totalTime || 0;
+        const newTotalTime = Math.max(0, currentTotalTime - timeframeInMinutes); // Ensure totalTime doesn't go negative
+  
+        await updateDoc(docRef, {
+          totalTime: newTotalTime,
+        });
+  
+        console.log('Total time updated successfully:', newTotalTime);
+      } else {
+        console.error('Document does not exist!');
+      }
+  
       console.log('Content and file deleted successfully');
     } catch (error) {
       console.error('Error deleting content and file:', error);
     }
   };
+  
 
   const renderContentItem = ({ item }) => {
     let contentTypeIcon;
@@ -224,7 +323,7 @@ const ContentScreen = ({ route }) => {
         <View style={styles.itemContainer}>
           {contentTypeIcon && contentTypeIcon}
           <Text style={styles.itemTitle}>{item.topicName}</Text>
-          <TouchableOpacity onPress={() => handleDeleteContent(item.id)}>
+          <TouchableOpacity onPress={() => handleDeleteContent(item.id, item.contentUrl)}>
             <FontAwesome name="trash" size={20} color="gray" />
           </TouchableOpacity>
         </View>
@@ -305,12 +404,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   input: {
-    marginTop:5,
+    marginTop: 5,
     borderWidth: 1,
     borderColor: 'gray',
     padding: 8,
     marginBottom: 16,
-    borderRadius:5
+    borderRadius: 5,
   }
 });
 

@@ -3,18 +3,26 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Button, Modal, StyleSheet } from 'react-native';
 import app from '../firebase';
 import { getFirestore, collection, addDoc } from 'firebase/firestore';
+import { useMyContext } from '../hooks/contextAPI';
 
 const NewChapterModal = ({ isVisible, onClose, onCreateChapter, subjectId, termId }) => {
   const [newChapterName, setNewChapterName] = useState('');
   const [position, setPosition] = useState('');
   const [week, setWeek] = useState('');
+  const { levelState, selectedCourseId } = useMyContext();
 
   const handleCreateChapter = async () => {
     try {
       const firestore = getFirestore(app);
+      let chaptersCollectionPath;
 
-      // Add the new chapter to the "chapters" collection under the specific term
-      const chapterDocRef = await addDoc(collection(firestore, `subjects/${subjectId}/terms/${termId}/chapters`), {
+      if (levelState === 'Tertiary' && selectedCourseId) {
+        chaptersCollectionPath = `courses/${selectedCourseId}/chapters`;
+      } else {
+        chaptersCollectionPath = `subjects/${subjectId}/terms/${termId}/chapters`;
+      }
+
+      const chapterDocRef = await addDoc(collection(firestore, chaptersCollectionPath), {
         name: newChapterName,
         position,
         week
@@ -49,13 +57,13 @@ const NewChapterModal = ({ isVisible, onClose, onCreateChapter, subjectId, termI
           />
 
           <Text>Position:</Text>
-
           <TextInput
             style={styles.input}
             value={position}
             onChangeText={setPosition}
           />
 
+          <Text>Week:</Text>
           <TextInput
             style={styles.input}
             value={week}

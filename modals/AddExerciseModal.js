@@ -19,6 +19,7 @@ import app from '../firebase';
 const AddExerciseModal = ({ isVisible, onClose, onUploadExercise }) => {
   const [exerciseName, setExerciseName] = useState('');
   const [exerciseDuration, setExerciseDuration] = useState('');
+  const [exercisePosition, setExercisePosition] = useState('');
   const [questions, setQuestions] = useState([
     { questionText: '', image: null, answers: [{ text: '', image: null, isCorrect: false }] },
   ]);
@@ -105,8 +106,17 @@ const AddExerciseModal = ({ isVisible, onClose, onUploadExercise }) => {
     );
   };
 
+  const generateRandomId = () => {
+    return 'xxxxxx'.replace(/[x]/g, function() {
+      const random = (Math.random() * 16) | 0;
+      return random.toString(16);
+    });
+  };
+
   const handleUploadExercise = async () => {
     const storage = getStorage(app);
+
+    const randomId = generateRandomId()
 
     // Create a function to upload an image to Firebase Storage and return the download URL
     const uploadImageToStorage = async (imageUri, folderName) => {
@@ -139,6 +149,8 @@ const AddExerciseModal = ({ isVisible, onClose, onUploadExercise }) => {
       topicName: exerciseName,
       timeframe:exerciseDuration,
       questions: updatedQuestions,
+      position:exercisePosition,
+      contentUrl:randomId
     });
 
     // Close the modal after uploading
@@ -159,6 +171,13 @@ const AddExerciseModal = ({ isVisible, onClose, onUploadExercise }) => {
             style={styles.input}
             value={exerciseName}
             onChangeText={setExerciseName}
+          />
+
+          <Text>Position:</Text>
+          <TextInput 
+            style={styles.input}
+            value={exercisePosition}
+            onChangeText={setExercisePosition}
           />
 
           <Text>Exercise Duration:</Text>

@@ -5,12 +5,12 @@ import { initializeApp } from "firebase/app";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyD939qUqn4p_9wuFXNuGGObPibVfLvnLLY",
-  authDomain: "watchnlearntrial.firebaseapp.com",
-  projectId: "watchnlearntrial",
-  storageBucket: "watchnlearntrial.appspot.com",
-  messagingSenderId: "993508798548",
-  appId: "1:993508798548:web:c7a2ca286dd8ec8cce3dc1"
+  apiKey: "AIzaSyAAAP9rHPbNXQWz1X26dEBa7sC4ZG9PZqo",
+  authDomain: "watchnlearn-77b8a.firebaseapp.com",
+  projectId: "watchnlearn-77b8a",
+  storageBucket: "watchnlearn-77b8a.appspot.com",
+  messagingSenderId: "358854985850",
+  appId: "1:358854985850:web:9b1b066692dd0c43f553c3"
 };
 
 // Initialize Firebase

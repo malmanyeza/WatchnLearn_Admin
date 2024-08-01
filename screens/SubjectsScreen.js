@@ -1,21 +1,24 @@
-// SubjectsScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons'; // Import FontAwesome from expo vector icons
 import app from '../firebase';
 import { getFirestore, collection, onSnapshot, deleteDoc, doc} from 'firebase/firestore';
 import {ref, getStorage, deleteObject} from 'firebase/storage';
 import { useNavigation } from '@react-navigation/native';
 import AddSubjectModal from '../modals/AddSubjectModal'; // Import your AddSubjectModal component
+import { useFirebase } from '../hooks/firebaseContext';
+import { useMyContext } from '../hooks/contextAPI';
 
 const SubjectsScreen = () => {
+  const { levelState, setSelectedCourseId } = useMyContext();
   const [subjects, setSubjects] = useState([]);
   const [isAddSubjectModalVisible, setAddSubjectModalVisible] = useState(false);
   const navigation = useNavigation();
 
   useEffect(() => {
     const firestore = getFirestore(app);
-    const subjectsCollection = collection(firestore, 'subjects');
+    const collectionName = levelState === 'Tertiary' ? 'courses' : 'subjects';
+    const subjectsCollection = collection(firestore, collectionName);
 
     const unsubscribe = onSnapshot(subjectsCollection, (snapshot) => {
       const subjectsData = snapshot.docs.map((doc) => ({
@@ -26,15 +29,21 @@ const SubjectsScreen = () => {
     });
 
     return () => unsubscribe(); // Unsubscribe when the component is unmounted
-  }, []);
+  }, [levelState]);
 
   const handleSubjectPress = (subjectId) => {
-    navigation.navigate('SubjectDetails', { subjectId });
+    if (levelState=='High School'||levelState=='Primary'){
+      navigation.navigate('SubjectDetails', { subjectId });
+    }else if (levelState=='Tertiary'){
+      setSelectedCourseId(subjectId)
+      navigation.navigate('Chapters');
+    }
   };
 
   const handleDeleteSubject = async (subjectId, imageUrl) => {
     try {
       const firestore = getFirestore(app);
+      const collectionName = levelState === 'Tertiary' ? 'courses' : 'subjects';
       const storage = getStorage(app);
   
       // Extract the image filename from the URL
@@ -45,7 +54,7 @@ const SubjectsScreen = () => {
       await deleteObject(imageRef);
   
       // Delete subject from Firestore
-      const subjectDocRef = doc(firestore, 'subjects', subjectId);
+      const subjectDocRef = doc(firestore, collectionName, subjectId);
       await deleteDoc(subjectDocRef);
   
       console.log('Subject and image deleted successfully');
@@ -53,7 +62,6 @@ const SubjectsScreen = () => {
       console.error('Error deleting subject and image:', error);
     }
   };
-  
 
   const renderSubjectItem = ({ item }) => (
     <TouchableOpacity style={styles.subjectItem} onPress={() => handleSubjectPress(item.id)}>
@@ -78,16 +86,14 @@ const SubjectsScreen = () => {
         style={styles.addButton}
         onPress={() => setAddSubjectModalVisible(true)}
       >
-        <Text style={styles.addButtonText}>Add New Subject</Text>
+        <Text style={styles.addButtonText}>{levelState === 'Tertiary' ? 'Add Course' : 'Add New Subject'}</Text>
       </TouchableOpacity>
 
       {/* AddSubjectModal */}
-      
-        <AddSubjectModal 
-          onClose={() => setAddSubjectModalVisible(false)}
-          isVisible={isAddSubjectModalVisible} 
-        />
-      
+      <AddSubjectModal 
+        onClose={() => setAddSubjectModalVisible(false)}
+        isVisible={isAddSubjectModalVisible} 
+      />
     </View>
   );
 };

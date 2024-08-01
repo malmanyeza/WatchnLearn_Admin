@@ -10,10 +10,14 @@ export const useFirebase = () => {
 };
 
 export const FirebaseProvider = ({ children }) => {
-  
+
 
   return (
-    <FirebaseContext.Provider value={value}>
+    <FirebaseContext.Provider value={
+      {
+        
+      }
+    }>
       {children}
     </FirebaseContext.Provider>
   );
